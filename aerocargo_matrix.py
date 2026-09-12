@@ -46,3 +46,69 @@ EOF
 git add aerocargo_matrix.py
 git commit -m "feat: implementar validacion dimensional y calculo de ocupacion local"
 git log --oneline
+
+def evaluar_balance(cargas: List[List[float]], tolerancia_kg: float) -> Dict[str, Any]:
+    """
+    Calcula pesos longitudinales por fila y el desbalance lateral en kg.
+    Si M es impar, omite la columna central (eje de simetria).
+    """
+    n = len(cargas)
+    m = len(cargas[0])
+    
+    pesos_longitudinales = [round(sum(fila), 2) for fila in cargas]
+    
+    mitad = m // 2
+    suma_izq = 0.0
+    suma_der = 0.0
+
+    if m % 2 == 0:
+        for fila in cargas:
+            suma_izq += sum(fila[:mitad])
+            suma_der += sum(fila[mitad:])
+    else:
+        for fila in cargas:
+            suma_izq += sum(fila[:mitad])
+            suma_der += sum(fila[mitad + 1:])
+
+    desbalance_lateral = round(abs(suma_izq - suma_der), 2)
+    aprobado = desbalance_lateral <= tolerancia_kg
+
+    return {
+        "pesos_longitudinales": pesos_longitudinales,
+        "desbalance_lateral": desbalance_lateral,
+        "balance_aprobado": aprobado
+    }
+
+
+def extraer_submatriz_critica(matriz_ocupacion: List[List[float]], k: int, p: int) -> List[List[float]]:
+    """
+    Extrae la submatriz contigua k x p con mayor promedio de ocupacion.
+    """
+    n = len(matriz_ocupacion)
+    m = len(matriz_ocupacion[0])
+
+    if k > n or p > m or k <= 0 or p <= 0:
+        raise ValueError("Dimensiones de submatriz fuera de los limites de la matriz.")
+
+    mejor_promedio = -1.0
+    mejor_origen = (0, 0)
+    total_celdas = k * p
+
+    for i in range(n - k + 1):
+        for j in range(m - p + 1):
+            suma_actual = sum(
+                matriz_ocupacion[i + r][j + c]
+                for r in range(k)
+                for c in range(p)
+            )
+            promedio_actual = suma_actual / total_celdas
+
+            if promedio_actual > mejor_promedio:
+                mejor_promedio = promedio_actual
+                mejor_origen = (i, j)
+
+    fila_ini, col_ini = mejor_origen
+    return [
+        [matriz_ocupacion[fila_ini + r][col_ini + c] for c in range(p)]
+        for r in range(k)
+    ]
